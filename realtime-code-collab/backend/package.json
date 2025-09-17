@@ -1,0 +1,21 @@
+{
+  "name": "realtime-code-collab-backend",
+  "version": "1.0.0",
+  "description": "Backend for Real-time Code Collaboration Tool",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["real-time", "collaboration", "backend", "socket.io"],
+  "author": "Aditya Malik",
+  "license": "MIT"
+}
