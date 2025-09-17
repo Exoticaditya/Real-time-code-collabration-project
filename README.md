@@ -63,6 +63,34 @@ A web-based platform for collaborative, real-time code editing where multiple us
    - Frontend: `http://localhost:3000`
    - Backend API: `http://localhost:5000`
 
+## 🌐 Production Deployment
+
+### Deploy to Render + GitHub Pages (Recommended)
+
+This project can be deployed with the backend on [Render](https://render.com) (free tier available) and the frontend on [GitHub Pages](https://pages.github.com) (completely free).
+
+**Quick Setup:**
+1. **Backend to Render:**
+   - Go to [Render.com](https://render.com) and connect your GitHub account
+   - Create a new "Web Service" from this repository
+   - Set Root Directory: `backend`
+   - Set Build Command: `npm install`
+   - Set Start Command: `npm start`
+   - Add environment variable: `CORS_ORIGIN=https://exoticaditya.github.io`
+
+2. **Frontend to GitHub Pages:**
+   - Go to your repository Settings → Pages
+   - Set Source to "GitHub Actions"
+   - Update `frontend/.env.production` with your Render URL
+   - Push changes to trigger automatic deployment
+
+📖 **Detailed instructions:** See [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+
+### Alternative Deployment Options
+
+- **Docker:** Use `docker-compose.prod.yml` for production Docker deployment
+- **Other Platforms:** Heroku, Railway, Vercel - see [DEPLOYMENT.md](DEPLOYMENT.md)
+
 ## 📖 How to Use
 
 1. **Join a Room**
