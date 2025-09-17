@@ -4,7 +4,15 @@ import Editor from "@monaco-editor/react";
 import LandingPage from "./LandingPage";
 import './App.css';
 
-const socket = io("http://localhost:5000");
+// Get backend URL from environment variables
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+const socket = io(BACKEND_URL, {
+  autoConnect: true,
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5,
+  timeout: 20000
+});
 
 function App() {
   const [roomId, setRoomId] = useState("");

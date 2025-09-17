@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import './RoomCreator.css';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+
 const RoomCreator = ({ onRoomCreated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -9,7 +11,7 @@ const RoomCreator = ({ onRoomCreated }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:5000/rooms', {
+      const response = await fetch(`${BACKEND_URL}/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

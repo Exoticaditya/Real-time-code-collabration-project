@@ -1,6 +1,7 @@
 {
   "name": "realtime-code-collab-frontend",
   "version": "1.0.0",
+  "description": "Frontend React app for real-time code collaboration with Monaco Editor",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
@@ -14,7 +15,11 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "test:coverage": "react-scripts test --coverage --watchAll=false",
+    "eject": "react-scripts eject",
+    "serve": "npx serve -s build -l 3000",
+    "docker:build": "docker build -t realtime-code-frontend .",
+    "docker:run": "docker run -p 3000:80 realtime-code-frontend"
   },
   "eslintConfig": {
     "extends": [
@@ -33,5 +38,36 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx}",
+      "!src/index.js",
+      "!src/serviceWorker.js",
+      "!src/reportWebVitals.js"
+    ]
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "react",
+    "real-time",
+    "collaboration",
+    "code-editor",
+    "monaco-editor",
+    "websocket",
+    "socket.io"
+  ],
+  "author": "Real-time Code Collaboration Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/real-time-code-collaboration.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/real-time-code-collaboration/issues"
+  },
+  "homepage": "https://github.com/yourusername/real-time-code-collaboration#readme"
 }

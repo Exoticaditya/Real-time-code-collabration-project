@@ -1,25 +1,81 @@
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 const { Server } = require('socket.io');
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { 
-  cors: { 
-    origin: "*",
-    methods: ["GET", "POST"]
-  } 
-});
 
-app.use(cors());
-app.use(express.json());
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// Compression middleware
+app.use(compression());
+
+// Logging middleware
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+  },
+});
+app.use('/api', limiter);
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  methods: ["GET", "POST"],
+  credentials: true
+};
+app.use(cors(corsOptions));
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Socket.IO configuration
+const io = new Server(server, { 
+  cors: corsOptions,
+  pingTimeout: parseInt(process.env.SOCKET_PING_TIMEOUT) || 60000,
+  pingInterval: parseInt(process.env.SOCKET_PING_INTERVAL) || 25000,
+});
 
 // Simple in-memory storage for rooms and code (for MVP)
 const rooms = {};
 
+// Health monitoring
+let serverStats = {
+  startTime: new Date(),
+  totalConnections: 0,
+  activeConnections: 0,
+  totalRooms: 0,
+  totalMessages: 0
+};
+
+// Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  serverStats.totalConnections++;
+  serverStats.activeConnections++;
+  
+  console.log(`User connected: ${socket.id}. Total active: ${serverStats.activeConnections}`);
   
   socket.on('join-room', ({ roomId, username }) => {
     console.log(`${username} joining room: ${roomId}`);
@@ -39,6 +95,7 @@ io.on('connection', (socket) => {
     
     rooms[roomId].users.add(username);
     rooms[roomId].lastActivity = new Date().toISOString();
+    serverStats.totalRooms = Object.keys(rooms).length;
     
     // Send current code to the new user
     socket.emit('init-code', rooms[roomId].code);
@@ -60,6 +117,7 @@ io.on('connection', (socket) => {
 
   socket.on('chat-message', ({ roomId, message, username }) => {
     console.log(`Chat message in room ${roomId} from ${username}: ${message}`);
+    serverStats.totalMessages++;
     if (rooms[roomId]) {
       rooms[roomId].lastActivity = new Date().toISOString();
     }
@@ -68,7 +126,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
+    serverStats.activeConnections--;
+    console.log(`User disconnected: ${socket.id}. Total active: ${serverStats.activeConnections}`);
     
     if (socket.roomId && socket.username && rooms[socket.roomId]) {
       rooms[socket.roomId].users.delete(socket.username);
@@ -80,6 +139,7 @@ io.on('connection', (socket) => {
       if (rooms[socket.roomId].users.size === 0) {
         console.log(`Cleaning up empty room: ${socket.roomId}`);
         delete rooms[socket.roomId];
+        serverStats.totalRooms = Object.keys(rooms).length;
       } else {
         console.log(`Room ${socket.roomId} now has ${rooms[socket.roomId].users.size} users`);
       }
@@ -91,8 +151,35 @@ io.on('connection', (socket) => {
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Real-time Code Collaboration API is running!',
-    activeRooms: Object.keys(rooms).length,
-    timestamp: new Date().toISOString()
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
+
+// Detailed health check with metrics
+app.get('/api/health', (req, res) => {
+  const uptime = process.uptime();
+  const memoryUsage = process.memoryUsage();
+  
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: {
+      seconds: Math.floor(uptime),
+      formatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`
+    },
+    memory: {
+      rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+      external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
+    },
+    server: {
+      ...serverStats,
+      activeRooms: Object.keys(rooms).length
+    }
   });
 });
 
@@ -133,8 +220,83 @@ app.post('/rooms', (req, res) => {
   res.json({ roomId, message: 'Room created successfully' });
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err.stack);
+  
+  if (process.env.NODE_ENV === 'production') {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Something went wrong!'
+    });
+  } else {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: err.message,
+      stack: err.stack
+    });
+  }
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not found',
+    message: 'The requested resource was not found'
+  });
+});
+
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+const serverInstance = server.listen(PORT, () => {
   console.log(`🚀 Real-time Code Collaboration Server running on port ${PORT}`);
   console.log(`📝 API endpoint: http://localhost:${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`⏰ Started at: ${new Date().toISOString()}`);
+});
+
+// Graceful shutdown handling
+const gracefulShutdown = (signal) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  // Close server to stop accepting new connections
+  serverInstance.close((err) => {
+    if (err) {
+      console.error('Error during server closure:', err);
+      process.exit(1);
+    }
+    
+    console.log('🔴 Server closed successfully');
+    
+    // Close Socket.IO server
+    io.close(() => {
+      console.log('🔴 Socket.IO server closed successfully');
+      
+      // Clean up resources
+      console.log('🧹 Cleaning up resources...');
+      
+      process.exit(0);
+    });
+  });
+  
+  // Force close after 30 seconds
+  setTimeout(() => {
+    console.error('⚠️  Forcefully shutting down after 30s timeout');
+    process.exit(1);
+  }, 30000);
+};
+
+// Handle different shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught Exception:', err);
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  gracefulShutdown('UNHANDLED_REJECTION');
 });

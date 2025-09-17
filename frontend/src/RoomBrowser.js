@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './RoomBrowser.css';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+
 const RoomBrowser = ({ onJoinRoom }) => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,7 @@ const RoomBrowser = ({ onJoinRoom }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:5000/rooms');
+      const response = await fetch(`${BACKEND_URL}/rooms`);
       if (response.ok) {
         const data = await response.json();
         setRooms(data.rooms);
