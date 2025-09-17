@@ -48,8 +48,8 @@ jobs:
           
       - name: Build frontend
         env:
-          # Point to your Render backend URL (update this after deploying to Render)
-          REACT_APP_BACKEND_URL: https://your-app-name.onrender.com
+          # Point to your Render backend URL
+          REACT_APP_BACKEND_URL: https://real-time-code-collaboration-project.onrender.com
           PUBLIC_URL: /Real-time-code-collabration-project
         run: |
           cd frontend
